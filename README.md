@@ -1,2 +1,3 @@
 # FingerprintAttendance
-Maturitní projekt, Patrik Bartoš
+Závěrečná práce, Patrik Bartoš
+
