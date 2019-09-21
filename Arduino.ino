@@ -2,8 +2,8 @@
 #include <LiquidCrystal.h>          //Knihovna pro LCD
 #include <Adafruit_Fingerprint.h>   //Knihovna pro scanner
 
-#define NAME "bary"             //Wifi SSID
-#define PASS "22042001"         //Wifi heslo
+#define NAME ""             //Wifi SSID
+#define PASS ""             //Wifi heslo
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 SoftwareSerial ESP(6, 7);
@@ -11,7 +11,6 @@ SoftwareSerial SCANNER(8, 9);
 
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SCANNER);
 
-uint8_t id;
 byte buttons[] = {A3,A4,A5};
 String menu[] = {"Pridat otisk", "Overit otisk", "Smazat otisk"};     //Položky v menu
 int menuItems = 3;   //Počet položek v menu
@@ -45,7 +44,7 @@ void setup(){
   lcd.setCursor(0, 1);
   lcd.print("to WiFi");
   //Připojení k wifi
- /* while(1){
+  /*while(1){
     ESP.print("AT+CWJAP=\"");
     ESP.print(NAME);
     ESP.print("\",\"");
@@ -89,6 +88,7 @@ void menuReset(){
   lcd.setCursor(0, 0);
   lcd.print(">");
   cursorPos = 0;
+  menuPos = 0;
   delay(500);
 }
 
@@ -121,6 +121,116 @@ void selection(){
   }
 }
 
+int selectID(){
+  int id = 1;
+  int p = -1;
+  while(1){
+    p = finger.loadModel(id);
+    if(p == FINGERPRINT_OK){
+      id++;
+    }
+    else if(p == FINGERPRINT_BADLOCATION){
+      break;
+    }
+    else if(p == FINGERPRINT_PACKETRECIEVEERR){
+      break;
+    }
+    else{
+      break;
+    }
+  }
+  return id;
+}
+
+int selectionDelete(){
+  int id = 1;
+  int i = 0;
+  int p = finger.getTemplateCount();
+  if(finger.templateCount - 1 == 0){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Nejsou ulozeny");
+    lcd.setCursor(0, 1);
+    lcd.print("zadne otisky");
+    delay(2000);
+    return 0;
+  }
+  int count = finger.templateCount - 1;
+  int idArray[count];
+  while(count > 0){
+    p = finger.loadModel(id);
+    if(p == FINGERPRINT_OK){
+      idArray[i] = id;
+      count--;
+      i++;
+      id++;
+    }
+    else if(p == FINGERPRINT_BADLOCATION){
+      id++;
+    }
+    else if(p == FINGERPRINT_PACKETRECIEVEERR){
+      id++;
+    }
+    else{
+      id++;
+    }
+  }
+  lcd.clear();
+  for(i = 0; i < 2; i++){
+    if(finger.templateCount - 1 == 1){
+      lcd.setCursor(0, 0);
+      lcd.print(">");
+      lcd.setCursor(2, 0);
+      lcd.print(idArray[0]);
+      delay(500);
+      while(digitalRead(buttons[1]) == 0){
+        if(digitalRead(buttons[2]) == 1)
+          return 0;
+      }
+      return idArray[0];
+    }
+    else{
+      lcd.setCursor(2, i);
+      lcd.print(idArray[i]);
+    }
+  }
+  lcd.setCursor(0, 0);
+  lcd.print(">");
+  cursorPos = 0;
+  menuPos = 0;
+  delay(500);
+  while(digitalRead(buttons[1]) == 0){
+    if(digitalRead(buttons[2]) == 1)
+      return 0;
+    if(digitalRead(buttons[0]) == 1){
+      menuPos++;
+      if(menuPos == 0)
+        cursorPos = 0;
+      else
+        cursorPos = 1;
+      //Když dojdeme na konec menu, posune kurzor zpět na začátek
+      if(menuPos > finger.templateCount - 2){
+        cursorPos = 0;
+        menuPos = 0;
+      }
+      //Posouvání v menu
+      lcd.clear();
+      for(i = 0; i < 2; i++){
+        lcd.setCursor(2, i);
+        if(menuPos == 0)
+          lcd.print(idArray[i + menuPos]);
+        else
+          lcd.print(idArray[i + menuPos - 1]);
+      }
+      //Vypsání kurzoru
+      lcd.setCursor(0, cursorPos);
+      lcd.print(">");
+      delay(500);
+    }
+  }
+  return idArray[menuPos];
+}
+
 void loop(){
   //Výběr v menu
   selection();
@@ -141,7 +251,8 @@ void loop(){
 }
 
 void addFinger(){
-  id = 10;
+  int id = selectID();
+  Serial.println(id);
   int p = -1;
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -323,6 +434,7 @@ void addFinger(){
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Unknown error");
+    delay(1000);
     return p;
   } 
   p = finger.storeModel(id);
@@ -344,18 +456,21 @@ void addFinger(){
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Chyba ukladani");
+    delay(1000);
     return p;
   }
   else if (p == FINGERPRINT_FLASHERR){
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Chyba ukladani");
+    delay(1000);
     return p;
   }
   else{
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Unknown error");
+    delay(1000);
     return p;
   } 
   menuReset();
@@ -374,13 +489,50 @@ void checkFinger(){
 }
 
 void deleteFinger(){
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Smazat otisk");
-  while(digitalRead(buttons[2]) == 0){
-    //Zde bude kód pro smazání existujícího otisku v databázi
+  int id = selectionDelete();
+  if(id == 0)
+    menuReset();
+  else{
+    int p = -1;
+    p = finger.deleteModel(id);
+    if (p == FINGERPRINT_OK){
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Otisk uspesne");
+      lcd.setCursor(0, 1);
+      lcd.print("smazan");
+      delay(3000);
+    }
+    else if (p == FINGERPRINT_PACKETRECIEVEERR){
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Chyba komunikace");
+      delay(1000);
+      return p;
+    }
+    else if (p == FINGERPRINT_BADLOCATION) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Chyba ukladani");
+      delay(1000);
+      return p;
+    }
+    else if (p == FINGERPRINT_FLASHERR) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Chyba ukladani");
+      delay(1000);
+      return p;
+    }
+    else{
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Unknown error");
+      delay(1000);
+      return p;
+    }
+    menuReset();
   }
-  menuReset();
 }
 
 
