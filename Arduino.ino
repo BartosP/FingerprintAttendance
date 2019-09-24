@@ -1,9 +1,10 @@
 #include <SoftwareSerial.h>
 #include <LiquidCrystal.h>          //Knihovna pro LCD
 #include <Adafruit_Fingerprint.h>   //Knihovna pro scanner
+#include <WiFiEsp.h>
 
-#define NAME ""             //Wifi SSID
-#define PASS ""             //Wifi heslo
+#define NAME "bary"                 //Wifi SSID
+#define PASS "22042001"             //Wifi heslo
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 SoftwareSerial ESP(6, 7);
@@ -19,61 +20,51 @@ int menuPos = 0;     //Vybraná položka v menu
 int checkConnect = 0;
 
 void setup(){
-  Serial.begin(9600); 
-  ESP.begin(9600);
+  Serial.begin(9600);
   lcd.begin(16,2);
-  finger.begin(57600);
-
-  //Ověření scanneru
-  if (finger.verifyPassword()){
-    lcd.setCursor(0, 0);
-    lcd.print("Scanner found...");
-  }
-  else{
-    lcd.setCursor(0, 0);
-    lcd.print("Scanner not");
-    lcd.setCursor(0, 1);
-    lcd.print("found...");
-  }
-  delay(1000);
   
-  ESP.println("AT+RST");
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Connecting");
-  lcd.setCursor(0, 1);
-  lcd.print("to WiFi");
   //Připojení k wifi
-  /*while(1){
-    ESP.print("AT+CWJAP=\"");
-    ESP.print(NAME);
-    ESP.print("\",\"");
-    ESP.print(PASS);
-    ESP.print("\"\r\n");
-    ESP.setTimeout(5000);
-    //Pokud se podaří připojit, cyklus se ukončí
-    if(ESP.find("WIFI CONNECTED\r\n") == 1){
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Pripojeno k WiFi");
-      lcd.setCursor(0, 1);
-      lcd.print(NAME);
-      delay(5000);
-      break;
-    }
-    //Pokud se nepodaří připojit na 3. pokus, vypíše se hláška a cyklus se ukončí
+  ESP.begin(9600);
+  WiFi.init(&ESP);
+  lcd.setCursor(0, 0);
+  lcd.print("Pripojuji se k");
+  lcd.setCursor(0, 1);
+  lcd.print("siti ");
+  lcd.print(NAME);
+  while (WiFi.status() != WL_CONNECTED){
+    lcd.print(".");
+    WiFi.begin(NAME, PASS);
     checkConnect++;
-    if(checkConnect > 3){
+    if(checkConnect > 2){
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Nepodarilo se");
       lcd.setCursor(0, 1);
-      lcd.print("pripojit k WiFi");
-      delay(5000);
+      lcd.print("pripojit k siti");
+      delay(2000);
       break;
     }
-  }*/
+  }
+  if(WiFi.status() == WL_CONNECTED){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Pripojeno k siti");
+    lcd.setCursor(0, 1);
+    lcd.print(NAME);
+    delay(2000);
+  }
 
+  //Ověření scanneru
+  lcd.clear();
+  finger.begin(57600);
+  if (!finger.verifyPassword()){
+    lcd.setCursor(0, 0);
+    lcd.print("Nenalezen");
+    lcd.setCursor(0, 1);
+    lcd.print("senzor...");
+    delay(2000);
+  }
+  
   //Načtení menu
   menuReset();
 }
@@ -126,18 +117,10 @@ int selectID(){
   int p = -1;
   while(1){
     p = finger.loadModel(id);
-    if(p == FINGERPRINT_OK){
+    if(p == FINGERPRINT_OK)
       id++;
-    }
-    else if(p == FINGERPRINT_BADLOCATION){
+    else
       break;
-    }
-    else if(p == FINGERPRINT_PACKETRECIEVEERR){
-      break;
-    }
-    else{
-      break;
-    }
   }
   return id;
 }
@@ -165,15 +148,8 @@ int selectionDelete(){
       i++;
       id++;
     }
-    else if(p == FINGERPRINT_BADLOCATION){
+    else
       id++;
-    }
-    else if(p == FINGERPRINT_PACKETRECIEVEERR){
-      id++;
-    }
-    else{
-      id++;
-    }
   }
   lcd.clear();
   for(i = 0; i < 2; i++){
@@ -208,12 +184,10 @@ int selectionDelete(){
         cursorPos = 0;
       else
         cursorPos = 1;
-      //Když dojdeme na konec menu, posune kurzor zpět na začátek
       if(menuPos > finger.templateCount - 2){
         cursorPos = 0;
         menuPos = 0;
       }
-      //Posouvání v menu
       lcd.clear();
       for(i = 0; i < 2; i++){
         lcd.setCursor(2, i);
@@ -222,7 +196,6 @@ int selectionDelete(){
         else
           lcd.print(idArray[i + menuPos - 1]);
       }
-      //Vypsání kurzoru
       lcd.setCursor(0, cursorPos);
       lcd.print(">");
       delay(500);
@@ -232,9 +205,7 @@ int selectionDelete(){
 }
 
 void loop(){
-  //Výběr v menu
   selection();
-  //Předpřipravené funkce
   if(digitalRead(buttons[1]) == 1){
     switch(menuPos){
       case 0:
@@ -261,79 +232,42 @@ void addFinger(){
   lcd.print("pro pridani");
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
+    if(digitalRead(buttons[2]) == 1){
+      menuReset();
+      return;
+    }
     switch (p){
       case FINGERPRINT_OK:
         break;
       case FINGERPRINT_NOFINGER:
         break;
-      case FINGERPRINT_PACKETRECIEVEERR:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error");
-        delay(1000);
-        break;
-      case FINGERPRINT_IMAGEFAIL:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error");
-        delay(1000);
-        break;
       default:
         lcd.clear();
         lcd.setCursor(0, 0);
-        lcd.print("Unknown error");
+        lcd.print("Error");
         delay(1000);
-        break;
+        menuReset();
+        return;
     }
   }
-  delay(2000);
   p = finger.image2Tz(1);
   switch (p){
     case FINGERPRINT_OK:
       break;
-    case FINGERPRINT_IMAGEMESS:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
-    case FINGERPRINT_PACKETRECIEVEERR:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Chyba komunikace");
-      delay(1000);
-      return p;
-    case FINGERPRINT_FEATUREFAIL:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
-    case FINGERPRINT_INVALIDIMAGE:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
     default:
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Unknown error");
-      return p;
+      lcd.print("Error");
+      delay(1000);
+      menuReset();
+      return;
   }
-  delay(2000);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Odeberte prst");
   delay(2000);
   p = 0;
-  while (p != FINGERPRINT_NOFINGER) {
+  while(p != FINGERPRINT_NOFINGER) {
     p = finger.getImage();
   }
   p = -1;
@@ -344,82 +278,38 @@ void addFinger(){
   lcd.print("znovu");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
+    if(digitalRead(buttons[2]) == 1){
+      menuReset();
+      return;
+    }
     switch (p){
       case FINGERPRINT_OK:
         break;
       case FINGERPRINT_NOFINGER:
         break;
-     case FINGERPRINT_PACKETRECIEVEERR:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error");
-        delay(1000);
-        break;
-      case FINGERPRINT_IMAGEFAIL:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error");
-        delay(1000);
-        break;
       default:
         lcd.clear();
         lcd.setCursor(0, 0);
-        lcd.print("Unknown error 1");
+        lcd.print("Error");
         delay(1000);
-        break;
+        menuReset();
+        return;
     }
   }
-  delay(2000);
   p = finger.image2Tz(2);
   switch (p){
     case FINGERPRINT_OK:
       break;
-    case FINGERPRINT_IMAGEMESS:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
-    case FINGERPRINT_PACKETRECIEVEERR:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Chyba komunikace");
-      delay(1000);
-      return p;
-    case FINGERPRINT_FEATUREFAIL:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
-    case FINGERPRINT_INVALIDIMAGE:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nelze rozpoznat");
-      lcd.setCursor(0, 1);
-      lcd.print("otisk");
-      delay(1000);
-      return p;
     default:
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Unknown error");
-      return p;
+      lcd.print("Error");
+      delay(1000);
+      menuReset();
+      return;
   }
-  delay(2000);
   p = finger.createModel();
   if(p == FINGERPRINT_OK){}
-  else if(p == FINGERPRINT_PACKETRECIEVEERR){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Chyba komunikace");
-    delay(1000);
-    return p;
-  }
   else if(p == FINGERPRINT_ENROLLMISMATCH){
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -428,14 +318,15 @@ void addFinger(){
     lcd.print("neshoduji");
     delay(1000);
     menuReset();
-    return p;
+    return;
   }
   else{
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Unknown error");
+    lcd.print("Error");
     delay(1000);
-    return p;
+    menuReset();
+    return;
   } 
   p = finger.storeModel(id);
   if (p == FINGERPRINT_OK) {
@@ -446,33 +337,14 @@ void addFinger(){
     lcd.print("ulozen");
     delay(3000);
   }
-  else if(p == FINGERPRINT_PACKETRECIEVEERR){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Chyba komunikace");
-    return p;
-  }
-  else if(p == FINGERPRINT_BADLOCATION){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Chyba ukladani");
-    delay(1000);
-    return p;
-  }
-  else if (p == FINGERPRINT_FLASHERR){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Chyba ukladani");
-    delay(1000);
-    return p;
-  }
   else{
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Unknown error");
+    lcd.print("Error");
     delay(1000);
-    return p;
-  } 
+    menuReset();
+    return;
+  }
   menuReset();
 }
   
@@ -503,33 +375,11 @@ void deleteFinger(){
       lcd.print("smazan");
       delay(3000);
     }
-    else if (p == FINGERPRINT_PACKETRECIEVEERR){
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Chyba komunikace");
-      delay(1000);
-      return p;
-    }
-    else if (p == FINGERPRINT_BADLOCATION) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Chyba ukladani");
-      delay(1000);
-      return p;
-    }
-    else if (p == FINGERPRINT_FLASHERR) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Chyba ukladani");
-      delay(1000);
-      return p;
-    }
     else{
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Unknown error");
+      lcd.print("Error");
       delay(1000);
-      return p;
     }
     menuReset();
   }
