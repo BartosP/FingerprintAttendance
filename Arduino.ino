@@ -1,14 +1,16 @@
 #include <SoftwareSerial.h>
 #include <LiquidCrystal.h>          //Knihovna pro LCD
 #include <Adafruit_Fingerprint.h>   //Knihovna pro scanner
-#include <WiFiEsp.h>
+#include <WiFiEsp.h>                //Knihovna pro WiFi
 
-#define NAME "bary"                 //Wifi SSID
-#define PASS "22042001"             //Wifi heslo
+#define NAME ""                 //Wifi SSID
+#define PASS ""                 //Wifi heslo
+#define SRV ""                  //Lokální IP
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 SoftwareSerial ESP(6, 7);
 SoftwareSerial SCANNER(8, 9);
+WiFiEspClient client;
 
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SCANNER);
 
@@ -20,7 +22,7 @@ int menuPos = 0;     //Vybraná položka v menu
 int checkConnect = 0;
 
 void setup(){
-  Serial.begin(9600);
+  Serial.begin(57600);
   lcd.begin(16,2);
   
   //Připojení k wifi
@@ -56,7 +58,7 @@ void setup(){
 
   //Ověření scanneru
   lcd.clear();
-  finger.begin(57600);
+  finger.begin(9600);
   if (!finger.verifyPassword()){
     lcd.setCursor(0, 0);
     lcd.print("Nenalezen");
@@ -204,6 +206,41 @@ int selectionDelete(){
   return idArray[menuPos];
 }
 
+//Test pro exportování otisku
+uint8_t uploadFingerpintTemplate(uint16_t id){
+ uint8_t p = finger.loadModel(id);
+  switch (p) {
+    case FINGERPRINT_OK:
+      break;
+    default:
+      Serial.print("Error");
+      return p;
+  }
+  p = finger.getModel2();
+  switch (p) {
+    case FINGERPRINT_OK:
+      break;
+   default:
+      Serial.print("Error");
+      return p;
+  }
+  uint8_t templateBuffer[688];
+  memset(templateBuffer, 0xffff, 688);
+  int i = 0;
+  uint32_t starttime = millis();
+  while((i < 688) && ((millis() - starttime) < 1000)){
+    if (SCANNER.available() > 0){
+      templateBuffer[i] = SCANNER.read();
+      i++;
+    }
+  }
+  for (i = 0; i < 688; i++){
+    Serial.print(templateBuffer[i]);
+    Serial.print(", ");
+  }
+  Serial.println();
+}
+
 void loop(){
   selection();
   if(digitalRead(buttons[1]) == 1){
@@ -223,7 +260,6 @@ void loop(){
 
 void addFinger(){
   int id = selectID();
-  Serial.println(id);
   int p = -1;
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -345,6 +381,20 @@ void addFinger(){
     menuReset();
     return;
   }
+  uploadFingerpintTemplate(id);
+  /*ESP.begin(9600);
+  if (client.connect(SRV, 80)) {
+    client.print("GET /attendance/fingerprint.php?img=");
+    client.print("jan");
+    client.print(" HTTP/1.1");
+    client.println();
+    String host = "Host: ";
+    host += SRV;
+    client.println(host);
+    client.println("Connection: close");
+    client.println();
+  }
+  finger.begin(9600);*/
   menuReset();
 }
   
@@ -354,9 +404,7 @@ void checkFinger(){
   lcd.print("Prilozte otisk");
   lcd.setCursor(0, 1);
   lcd.print("pro overeni");
-  while(digitalRead(buttons[2]) == 0){
-    //Zde bude kód pro ověření existujícího otisku v databázi
-  }
+  delay(3000);
   menuReset();
 }
 
@@ -384,5 +432,3 @@ void deleteFinger(){
     menuReset();
   }
 }
-
-
