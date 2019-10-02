@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 4.8.4
+-- version 4.9.0.1
 -- https://www.phpmyadmin.net/
 --
 -- Počítač: 127.0.0.1
--- Vytvořeno: Stř 18. zář 2019, 19:30
--- Verze serveru: 10.1.37-MariaDB
--- Verze PHP: 7.3.1
+-- Vytvořeno: Sob 28. zář 2019, 17:08
+-- Verze serveru: 10.4.6-MariaDB
+-- Verze PHP: 7.3.9
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET AUTOCOMMIT = 0;
@@ -29,23 +29,11 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `attendance` (
-  `id` int(11) NOT NULL,
-  `jmeno` varchar(50) NOT NULL,
-  `prijmeni` varchar(50) NOT NULL,
-  `cas` datetime NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
--- --------------------------------------------------------
-
---
--- Struktura tabulky `fingerprints`
---
-
-CREATE TABLE `fingerprints` (
   `id` int(10) UNSIGNED NOT NULL,
-  `jmeno` varchar(50) NOT NULL,
-  `prijmeni` varchar(50) NOT NULL,
-  `otisk` blob NOT NULL
+  `prijmeni` varchar(45) DEFAULT NULL,
+  `jmeno` varchar(45) DEFAULT NULL,
+  `datum` date DEFAULT NULL,
+  `cas` time DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 --
@@ -56,29 +44,17 @@ CREATE TABLE `fingerprints` (
 -- Klíče pro tabulku `attendance`
 --
 ALTER TABLE `attendance`
-  ADD PRIMARY KEY (`id`);
+  ADD KEY `fk_idx` (`id`);
 
 --
--- Klíče pro tabulku `fingerprints`
---
-ALTER TABLE `fingerprints`
-  ADD PRIMARY KEY (`id`);
-
---
--- AUTO_INCREMENT pro tabulky
+-- Omezení pro exportované tabulky
 --
 
 --
--- AUTO_INCREMENT pro tabulku `attendance`
+-- Omezení pro tabulku `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pro tabulku `fingerprints`
---
-ALTER TABLE `fingerprints`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  ADD CONSTRAINT `fk_id` FOREIGN KEY (`id`) REFERENCES `fingerprints` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
