@@ -3,9 +3,9 @@
 #include <Adafruit_Fingerprint.h>   //Knihovna pro scanner
 #include <WiFiEsp.h>                //Knihovna pro WiFi
 
-#define NAME ""                 //Wifi SSID
-#define PASS ""                 //Wifi heslo
-#define SRV ""                  //Lokální IP
+#define NAME "bary"                 //Wifi SSID
+#define PASS "22042001"                 //Wifi heslo
+#define SRV "10.0.0.32"                  //Lokální IP
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 SoftwareSerial ESP(6, 7);
@@ -22,7 +22,7 @@ int menuPos = 0;     //Vybraná položka v menu
 int checkConnect = 0;
 
 void setup(){
-  Serial.begin(57600);
+  Serial.begin(9600);
   lcd.begin(16,2);
   
   //Připojení k wifi
@@ -73,6 +73,7 @@ void setup(){
 
 void menuReset(){
   //Vypíše první 2 položky v menu a nastaví kurzor na 1. položku
+  lcd.begin(16,2);
   lcd.clear();
   for(int i = 0; i < 2; i++){
     lcd.setCursor(2, i);
@@ -206,14 +207,12 @@ int selectionDelete(){
   return idArray[menuPos];
 }
 
-//Test pro exportování otisku
 uint8_t uploadFingerpintTemplate(uint16_t id){
- uint8_t p = finger.loadModel(id);
-  switch (p) {
+  int p = finger.loadModel(id);
+  switch (p){
     case FINGERPRINT_OK:
       break;
     default:
-      Serial.print("Error");
       return p;
   }
   p = finger.getModel2();
@@ -221,24 +220,36 @@ uint8_t uploadFingerpintTemplate(uint16_t id){
     case FINGERPRINT_OK:
       break;
    default:
-      Serial.print("Error");
       return p;
   }
   uint8_t templateBuffer[688];
   memset(templateBuffer, 0xffff, 688);
   int i = 0;
   uint32_t starttime = millis();
-  while((i < 688) && ((millis() - starttime) < 1000)){
+  while ((i < 688) && ((millis() - starttime) < 1000)){
     if (SCANNER.available() > 0){
       templateBuffer[i] = SCANNER.read();
       i++;
     }
   }
-  for (i = 0; i < 688; i++){
-    Serial.print(templateBuffer[i]);
-    Serial.print(", ");
+  ESP.begin(9600);
+  if (client.connect(SRV, 80)) {
+    client.print("GET /ArduinoProjekt/fingerprint.php?otisk=");
+    for(int i = 0; i < 688; i++){
+      client.print("0x");
+      client.print(templateBuffer[i], HEX);
+      client.print(",");
+    }
+    client.print(" HTTP/1.1");
+    client.println();
+    String host = "Host: ";
+    host += SRV;
+    client.println(host);
+    client.println("Connection: close");
+    client.println();
   }
-  Serial.println();
+  finger.begin(9600);
+  return p;
 }
 
 void loop(){
@@ -365,14 +376,7 @@ void addFinger(){
     return;
   } 
   p = finger.storeModel(id);
-  if (p == FINGERPRINT_OK) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Otisk uspesne");
-    lcd.setCursor(0, 1);
-    lcd.print("ulozen");
-    delay(3000);
-  }
+  if (p == FINGERPRINT_OK) {}
   else{
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -382,19 +386,12 @@ void addFinger(){
     return;
   }
   uploadFingerpintTemplate(id);
-  /*ESP.begin(9600);
-  if (client.connect(SRV, 80)) {
-    client.print("GET /attendance/fingerprint.php?img=");
-    client.print("jan");
-    client.print(" HTTP/1.1");
-    client.println();
-    String host = "Host: ";
-    host += SRV;
-    client.println(host);
-    client.println("Connection: close");
-    client.println();
-  }
-  finger.begin(9600);*/
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Otisk uspesne");
+  lcd.setCursor(0, 1);
+  lcd.print("ulozen");
+  delay(3000);
   menuReset();
 }
   
@@ -405,6 +402,7 @@ void checkFinger(){
   lcd.setCursor(0, 1);
   lcd.print("pro overeni");
   delay(3000);
+  uploadFingerpintTemplate(2);
   menuReset();
 }
 
