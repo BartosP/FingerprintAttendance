@@ -8,7 +8,7 @@ Docházka do školy s využitím snímače otisků prstů
 - [x] Menu na LCD displeji 
 - [x] Připojení na WiFi
 - [x] Vytvoření databáze
-- [ ] Propojení s databází
+- [x] Propojení s databází
 - [ ] Ukládání/mazání otisků - *Zatím ukládání pouze do paměti sensoru*
 - [ ] Porovnávání otisků
 - [ ] Webové stránky
