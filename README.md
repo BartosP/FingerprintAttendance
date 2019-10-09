@@ -16,3 +16,6 @@ Docházka do školy s využitím snímače otisků prstů
 - [ ] Dokumentace
 - [ ] Dokončení dokumentace
 - [ ] Vylepšení/úpravy projektu
+
+# Schéma
+![Schéma](https://github.com/BartosP/FingerprintAttendance/blob/master/scheme/Sch%C3%A9ma.png)
