@@ -5,20 +5,16 @@ Docházka do školy s využitím snímače otisků prstů
 
 # Úkoly
 - [x] Zapojení obvodu
-- [x] Menu na LC displeji 
 - [x] Připojení na WiFi
 - [x] Vytvoření databáze
-- [x] Propojení s databází
+- [ ] Propojení s databází
 - [ ] Ukládání/mazání otisků - *Zatím pouze ukládání*
 - [ ] Porovnávání otisků
-- [ ] Webové stránky
+- [x] Webové stránky
 - [ ] Dokončení softwaru
 - [ ] Dokumentace
 - [ ] Dokončení dokumentace
 - [ ] Vylepšení/úpravy projektu
-
-# Schéma
-![Schéma](https://github.com/BartosP/FingerprintAttendance/blob/master/scheme/Sch%C3%A9ma.png)
 
 # Zdroje
 LCD  
