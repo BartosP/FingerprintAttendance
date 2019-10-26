@@ -2,29 +2,19 @@
 #include "LiquidCrystal_I2C.h"
 #include "WiFiEsp.h"
 #include "WiFiEspClient.h"
-#include "MySQL_Connection.h"
-#include "MySQL_Cursor.h"
 
 #define NAME "bary"
 #define PASS "22042001"
-char MySQLUser[] = "root";
-char MySQLPass[] = "";
-IPAddress MySQLIP(10,0,0,36); 
+#define SRV "10.0.0.33"
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 SoftwareSerial ESP(5, 6);
 SoftwareSerial SCANNER(2, 3);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SCANNER);
 WiFiEspClient client;
-MySQL_Connection conn(&client);
-MySQL_Cursor* cursor;
-
-char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES ('%s', '%s', '%s')";
-char query[1200];
-String name = "jmenotest";
-String surname = "prijmenitest";
-String otisk = "otisktest";
-int zdar = 0;
+char name[] = "testjmeno";
+char surname[] = "prijmenitest";
+uint8_t templateBuffer[534] = {};
 
 void setup() {
   Serial.begin(9600);
@@ -40,10 +30,10 @@ void setup() {
   finger.begin(57600);
   if (!finger.verifyPassword()){
     Serial.println("Nenalezen senzor");
-    lcd.setCursor(0, 0);
-    lcd.print("Nenalezen");
-    lcd.setCursor(0, 1);
-    lcd.print("senzor...");
+    //lcd.setCursor(0, 0);
+    //lcd.print("Nenalezen");
+    //lcd.setCursor(0, 1);
+    //lcd.print("senzor...");
     delay(2000);
   }
 }
@@ -62,18 +52,31 @@ int selectID(){
 }
 
 bool espListen(){
-  return 0;
+  return false;
 }
 
-void sendToDB(){
+bool sendToDB(){
   ESP.begin(9600);
-  while(!conn.connect(MySQLIP, 3306, MySQLUser, MySQLPass)){}
-  Serial.println("test1");
-  cursor = new MySQL_Cursor(&conn);
+  if (client.connect(SRV, 80)) {
+    Serial.println("Probiha ukladani...");
+    client.print("GET /ArduinoProjekt/fingerprint.php?otisk=");
+    for(int i = 0; i < 534; i++)
+      client.print(templateBuffer[i]);
+    client.print(" HTTP/1.1");
+    client.println();
+    String host = "Host: ";
+    host += SRV;
+    client.println(host);
+    client.println("Connection: close");
+    client.println();
+    finger.begin(57600);
+    return true;
+  }
   finger.begin(57600);
+  return false;
 }
 
-uint8_t downloadFingerpintTemplate(uint16_t id){
+uint8_t downloadFingerpintTemplate(uint16_t id, uint8_t *templateBuffer){
   uint8_t p = finger.loadModel(id);
   switch (p){
     case FINGERPRINT_OK:
@@ -92,30 +95,16 @@ uint8_t downloadFingerpintTemplate(uint16_t id){
       Serial.println(p);
       return p;
   }
-  uint8_t templateBuffer[534];
   memset(templateBuffer, 0xff, 534);
   uint32_t starttime = millis();
   int i = 0;
-  while ((i < 534) && ((millis() - starttime) < 20000)){
+  while ((i < 534) && ((millis() - starttime) < 20000)){ 
     if (SCANNER.available()){
       templateBuffer[i] = SCANNER.read();
       i++;
     }
   }
-  uint8_t fingerTemplate[512];
-  memset(fingerTemplate, 0xff, 512);
-  int j = 265;
-  i = 9;
-  while (i < 534) {
-      while (i < j)
-          fingerTemplate[i + 1] = templateBuffer[i];
-      j += 2;
-      while (i < j)
-        i++;
-      j = i + 9;
-  }
-  sendToDB();
-  return p;
+  return *templateBuffer;
 }
 
 void addFinger(){
@@ -224,7 +213,9 @@ void addFinger(){
     return;
   } 
   p = finger.storeModel(id);
-  if (p == FINGERPRINT_OK) {}
+  if (p == FINGERPRINT_OK){
+    downloadFingerpintTemplate(id, templateBuffer);
+  }
   else{
     Serial.println("Error");
     //lcd.clear();
@@ -233,8 +224,20 @@ void addFinger(){
     delay(1000);
     return;
   }
-  //downloadFingerpintTemplate(id);
-  delay(3000);
+  if(sendToDB())
+    Serial.println("Uspesne ulozeno");
+  else
+    Serial.println("Nepodarilo se ulozit otisk");
+  p = finger.deleteModel(id);
+  if (p == FINGERPRINT_OK){}
+  else{
+    Serial.println("Error deleting");
+    //lcd.clear();
+    //lcd.setCursor(0, 0);
+    //lcd.print("Error deleting");
+    delay(1000);
+    return;
+  }
 }
 
 void loop() {
@@ -244,10 +247,6 @@ void loop() {
   //lcd.setCursor(0, 1);
   //lcd.print("pro overeni");
   //delay(3000);
-  //if(espListen)
-  //addFinger();
-  if(zdar == 0){
-    sendToDB();
-    zdar++;
-  }
+  //if(espListen())
+    addFinger();
 }
