@@ -2,6 +2,7 @@
 #include "LiquidCrystal_I2C.h"
 #include "WiFiEsp.h"
 #include "WiFiEspClient.h"
+#include "string.h"
 
 #define NAME "bary"
 #define PASS "22042001"
@@ -12,8 +13,8 @@ SoftwareSerial ESP(5, 6);
 SoftwareSerial SCANNER(2, 3);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SCANNER);
 WiFiEspClient client;
-char name[] = "testjmeno";
-char surname[] = "prijmenitest";
+String name = "";
+String surname = "";
 uint8_t templateBuffer[534] = {};
 
 void setup() {
@@ -51,28 +52,53 @@ int selectID(){
   return id;
 }
 
-bool espListen(){
-  return false;
-}
-
-bool sendToDB(){
-  ESP.begin(9600);
+bool espGetData(){
   if (client.connect(SRV, 80)) {
-    Serial.println("Probiha ukladani...");
-    client.print("GET /ArduinoProjekt/fingerprint.php?otisk=");
-    for(int i = 0; i < 534; i++)
-      client.print(templateBuffer[i]);
+    client.print("GET /ArduinoProjekt/data.txt");
     client.print(" HTTP/1.1");
     client.println();
     String host = "Host: ";
     host += SRV;
     client.println(host);
+    client.println("Connection: Keep-Alive");
+    client.println();
+    String line;
+    while(client.available())
+      line = client.readStringUntil('\r');
+    client.print("GET /ArduinoProjekt/deleteData.php");
+    client.print(" HTTP/1.1");
+    client.println();
+    client.println(host);
+    client.println("Connection: Keep-Alive");
+    client.println();
+    char data[] = "";
+    line.toCharArray(data, 500);
+    char *pch;
+    pch = strtok(data, ";");
+    int i = 0;
+    /*while (pch != NULL && i < 3){
+      if(i == 1)
+        name = pch;
+      if(i == 2)
+        surname = pch;
+      pch = strtok (NULL, ";");
+      i++;
+    }*/
+    client.print("GET /ArduinoProjekt/fingerprint.php?otisk=");
+    for(i = 0; i < 534; i++)
+      client.print(templateBuffer[i]);
+    client.print("&name=");
+    client.print(name);
+    client.print("&surname=");
+    client.print(surname);
+    client.print(" HTTP/1.1");
+    client.println();
+    client.println(host);
     client.println("Connection: close");
     client.println();
-    finger.begin(57600);
+    client.stop();
     return true;
   }
-  finger.begin(57600);
   return false;
 }
 
@@ -118,8 +144,6 @@ void addFinger(){
   //lcd.print("pro pridani");
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
-    //if(!espListen)
-      //return;
     switch (p){
       case FINGERPRINT_OK:
         break;
@@ -164,8 +188,6 @@ void addFinger(){
   //lcd.print("znovu");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
-    //if(!espListen)
-      //return;
     switch (p){
       case FINGERPRINT_OK:
         break;
@@ -224,10 +246,12 @@ void addFinger(){
     delay(1000);
     return;
   }
-  if(sendToDB())
-    Serial.println("Uspesne ulozeno");
-  else
-    Serial.println("Nepodarilo se ulozit otisk");
+  ESP.begin(9600);
+    if(espGetData())
+      Serial.println("Uspesne ulozeno");
+    else
+      Serial.println("Chyba pri ukladani");
+  finger.begin(57600);
   p = finger.deleteModel(id);
   if (p == FINGERPRINT_OK){}
   else{
@@ -247,6 +271,5 @@ void loop() {
   //lcd.setCursor(0, 1);
   //lcd.print("pro overeni");
   //delay(3000);
-  //if(espListen())
-    addFinger();
+  addFinger();
 }
