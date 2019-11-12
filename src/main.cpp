@@ -1,42 +1,39 @@
-#include "Adafruit_Fingerprint.h"
-#include "LiquidCrystal_I2C.h"
-#include "WiFiEsp.h"
-#include "WiFiEspClient.h"
-#include "string.h"
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <MySQL_Connection.h>
+#include <MySQL_Cursor.h>
+#include <SoftwareSerial.h>
+#include <Adafruit_Fingerprint.h>
 
-#define NAME "bary"
-#define PASS "22042001"
-#define SRV "10.0.0.33"
+SoftwareSerial SENSOR(5, 4);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SENSOR);
 
-LiquidCrystal_I2C lcd(0x3F, 16, 2);
-SoftwareSerial ESP(5, 6);
-SoftwareSerial SCANNER(2, 3);
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SCANNER);
-WiFiEspClient client;
-String name = "";
-String surname = "";
-uint8_t templateBuffer[534] = {};
+IPAddress server_addr(10,0,0,33);
+char ssid[] = "bary";
+char pass[] = "22042001";
 
-void setup() {
+char user[] = "User";
+char password[] = "Password";
+char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES (%s, %s, %s)";
+char query[3000];
+
+WiFiClient client;
+MySQL_Connection conn(&client);
+
+void setup(){
   Serial.begin(9600);
-  ESP.begin(9600);
-  WiFi.init(&ESP);
-  while (WiFi.status() != WL_CONNECTED) {
-     WiFi.begin(NAME, PASS);
-  }
-  Serial.println("WiFi pripojena");
-  //lcd.begin(16,2);
-  //lcd.init();
-  //lcd.backlight();
+  WiFi.begin(ssid, pass);
+  delay(1000);
+  Serial.println();
+  Serial.print("Pripojuji se k Wifi ");
+  Serial.println(ssid);
+  while (WiFi.status() != WL_CONNECTED)
+    delay(100);
+  Serial.print("Pripojeno k WiFi ");
+  Serial.println(ssid);
   finger.begin(57600);
-  if (!finger.verifyPassword()){
+  if (!finger.verifyPassword())
     Serial.println("Nenalezen senzor");
-    //lcd.setCursor(0, 0);
-    //lcd.print("Nenalezen");
-    //lcd.setCursor(0, 1);
-    //lcd.print("senzor...");
-    delay(2000);
-  }
 }
 
 int selectID(){
@@ -52,65 +49,25 @@ int selectID(){
   return id;
 }
 
-bool espGetData(){
-  if (client.connect(SRV, 80)) {
-    client.print("GET /ArduinoProjekt/data.txt");
-    client.print(" HTTP/1.1");
-    client.println();
-    String host = "Host: ";
-    host += SRV;
-    client.println(host);
-    client.println("Connection: Keep-Alive");
-    client.println();
-    String line;
-    while(client.available())
-      line = client.readStringUntil('\r');
-    client.print("GET /ArduinoProjekt/deleteData.php");
-    client.print(" HTTP/1.1");
-    client.println();
-    client.println(host);
-    client.println("Connection: Keep-Alive");
-    client.println();
-    char data[] = "";
-    line.toCharArray(data, 500);
-    char *pch;
-    pch = strtok(data, ";");
-    int i = 0;
-    /*while (pch != NULL && i < 3){
-      if(i == 1)
-        name = pch;
-      if(i == 2)
-        surname = pch;
-      pch = strtok (NULL, ";");
-      i++;
-    }*/
-    client.print("GET /ArduinoProjekt/fingerprint.php?otisk=");
-    for(i = 0; i < 534; i++)
-      client.print(templateBuffer[i]);
-    client.print("&name=");
-    client.print(name);
-    client.print("&surname=");
-    client.print(surname);
-    client.print(" HTTP/1.1");
-    client.println();
-    client.println(host);
-    client.println("Connection: close");
-    client.println();
-    client.stop();
-    return true;
+String getName(){
+  String input;
+  while (!Serial.available ()) {}
+  if(Serial.available()){
+    input = Serial.readStringUntil('\n');
+    return input;
   }
-  return false;
+  else
+    return "Failed to get name/surname";
 }
 
-uint8_t downloadFingerpintTemplate(uint16_t id, uint8_t *templateBuffer){
+String downloadFingerpintTemplate(uint16_t id){
   uint8_t p = finger.loadModel(id);
   switch (p){
     case FINGERPRINT_OK:
       break;
     default:
       Serial.print("Error");
-      Serial.println(p);
-      return p;
+      return "Error";
   }
   p = finger.getModel();
   switch (p) {
@@ -118,30 +75,57 @@ uint8_t downloadFingerpintTemplate(uint16_t id, uint8_t *templateBuffer){
       break;
    default:
       Serial.print("Error");
-      Serial.println(p);
-      return p;
+      return "Error";
   }
+  uint8_t templateBuffer[534];
   memset(templateBuffer, 0xff, 534);
   uint32_t starttime = millis();
   int i = 0;
   while ((i < 534) && ((millis() - starttime) < 20000)){ 
-    if (SCANNER.available()){
-      templateBuffer[i] = SCANNER.read();
+    if (SENSOR.available()){
+      templateBuffer[i] = SENSOR.read();
       i++;
     }
   }
-  return *templateBuffer;
+  char buffer[3];
+  String otisk;
+  i = 0;
+  while (i < 534){
+    otisk += itoa(templateBuffer[i], buffer, 10);
+    i++;
+  }
+  return otisk;
+}
+
+void sendToDB(uint16_t id){
+  Serial.println("Zadejte jmeno:");
+  String jmeno = getName();
+  Serial.println("Zadejte prijmeni:");
+  String prijmeni = getName();
+  String otisk = downloadFingerpintTemplate(id);
+  char jmenoConv[jmeno.length()];
+  char prijmeniConv[prijmeni.length()];
+  char otiskConv[otisk.length()];
+  jmeno.toCharArray(jmenoConv, jmeno.length());
+  prijmeni.toCharArray(prijmeniConv, prijmeni.length());
+  otisk.toCharArray(otiskConv, otisk.length());
+  Serial.println("Pripojuji se k SQL");
+  if (conn.connect(server_addr, 3306, user, password)) {
+    MySQL_Cursor *cur_mem = new MySQL_Cursor(&conn);
+    sprintf(query, INSERT_DATA, jmenoConv, prijmeniConv, otiskConv);
+    cur_mem->execute(query);
+    delete cur_mem;
+    Serial.println("Data uspesne ulozena");
+  }
+  else
+    Serial.println("Nepodarilo se pripojit");
+  conn.close();
 }
 
 void addFinger(){
   int id = selectID();
   uint8_t p = -1;
   Serial.println("Prilozte otisk pro pridani");
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Prilozte otisk");
-  //lcd.setCursor(0, 1);
-  //lcd.print("pro pridani");
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
     switch (p){
@@ -151,10 +135,6 @@ void addFinger(){
         break;
       default:
         Serial.println("Error");
-        //lcd.clear();
-        //lcd.setCursor(0, 0);
-        //lcd.print("Error");
-        delay(1000);
         return;
     }
   }
@@ -164,28 +144,14 @@ void addFinger(){
       break;
     default:
       Serial.println("Error");
-      //lcd.clear();
-      //lcd.setCursor(0, 0);
-      //lcd.print("Error");
-      delay(1000);
       return;
   }
   Serial.println("Odeberte prst");
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Odeberte prst");
-  delay(2000);
   p = 0;
-  while(p != FINGERPRINT_NOFINGER) {
+  while(p != FINGERPRINT_NOFINGER)
     p = finger.getImage();
-  }
   p = -1;
   Serial.println("Prilozte otisk znovu");
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Prilozte otisk");
-  //lcd.setCursor(0, 1);
-  //lcd.print("znovu");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
     switch (p){
@@ -195,10 +161,6 @@ void addFinger(){
         break;
       default:
         Serial.println("Error");
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error");
-        delay(1000);
         return;
     }
   }
@@ -208,68 +170,31 @@ void addFinger(){
       break;
     default:
       Serial.println("Error");
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Error");
-      delay(1000);
       return;
   }
   p = finger.createModel();
   if(p == FINGERPRINT_OK){}
   else if(p == FINGERPRINT_ENROLLMISMATCH){
     Serial.println("Otisky se neshoduji");
-    //lcd.clear();
-    //lcd.setCursor(0, 0);
-    //lcd.print("Otisky se");
-    //lcd.setCursor(0, 1);
-    //lcd.print("neshoduji");
-    delay(1000);
     return;
   }
   else{
     Serial.println("Error");
-    //lcd.clear();
-    //lcd.setCursor(0, 0);
-    //lcd.print("Error");
-    delay(1000);
     return;
-  } 
+  }
   p = finger.storeModel(id);
-  if (p == FINGERPRINT_OK){
-    downloadFingerpintTemplate(id, templateBuffer);
-  }
-  else{
+  if (p != FINGERPRINT_OK){
     Serial.println("Error");
-    //lcd.clear();
-    //lcd.setCursor(0, 0);
-    //lcd.print("Error");
-    delay(1000);
     return;
   }
-  ESP.begin(9600);
-    if(espGetData())
-      Serial.println("Uspesne ulozeno");
-    else
-      Serial.println("Chyba pri ukladani");
-  finger.begin(57600);
+  sendToDB(id);
   p = finger.deleteModel(id);
-  if (p == FINGERPRINT_OK){}
-  else{
+  if (p != FINGERPRINT_OK){
     Serial.println("Error deleting");
-    //lcd.clear();
-    //lcd.setCursor(0, 0);
-    //lcd.print("Error deleting");
-    delay(1000);
     return;
   }
 }
 
-void loop() {
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Prilozte otisk");
-  //lcd.setCursor(0, 1);
-  //lcd.print("pro overeni");
-  //delay(3000);
+void loop(){
   addFinger();
 }
