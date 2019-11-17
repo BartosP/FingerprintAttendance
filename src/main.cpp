@@ -14,8 +14,8 @@ char pass[] = "22042001";
 
 char user[] = "User";
 char password[] = "Password";
-char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES (%s, %s, %s)";
-char query[3000];
+char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES ('%s', '%s', '%s')";
+char query[1500];
 
 WiFiClient client;
 MySQL_Connection conn(&client);
@@ -23,7 +23,7 @@ MySQL_Connection conn(&client);
 void setup(){
   Serial.begin(9600);
   WiFi.begin(ssid, pass);
-  delay(1000);
+  delay(3000);
   Serial.println();
   Serial.print("Pripojuji se k Wifi ");
   Serial.println(ssid);
@@ -36,28 +36,14 @@ void setup(){
     Serial.println("Nenalezen senzor");
 }
 
-int selectID(){
-  int id = 1;
-  uint8_t p = -1;
-  while(1){
-    p = finger.loadModel(id);
-    if(p == FINGERPRINT_OK)
-      id++;
-    else
-      break;
-  }
-  return id;
-}
-
 String getName(){
   String input;
-  while (!Serial.available ()) {}
-  if(Serial.available()){
+  while (!Serial.available()) {}
+  while (Serial.available()) {
     input = Serial.readStringUntil('\n');
     return input;
   }
-  else
-    return "Failed to get name/surname";
+  return "Error getting name/surname";
 }
 
 String downloadFingerpintTemplate(uint16_t id){
@@ -106,9 +92,9 @@ void sendToDB(uint16_t id){
   char jmenoConv[jmeno.length()];
   char prijmeniConv[prijmeni.length()];
   char otiskConv[otisk.length()];
-  jmeno.toCharArray(jmenoConv, jmeno.length());
-  prijmeni.toCharArray(prijmeniConv, prijmeni.length());
-  otisk.toCharArray(otiskConv, otisk.length());
+  jmeno.toCharArray(jmenoConv, jmeno.length() + 1);
+  prijmeni.toCharArray(prijmeniConv, prijmeni.length() + 1);
+  otisk.toCharArray(otiskConv, otisk.length() + 1);
   Serial.println("Pripojuji se k SQL");
   if (conn.connect(server_addr, 3306, user, password)) {
     MySQL_Cursor *cur_mem = new MySQL_Cursor(&conn);
@@ -123,7 +109,7 @@ void sendToDB(uint16_t id){
 }
 
 void addFinger(){
-  int id = selectID();
+  int id = 1;
   uint8_t p = -1;
   Serial.println("Prilozte otisk pro pridani");
   while (p != FINGERPRINT_OK){
@@ -188,13 +174,9 @@ void addFinger(){
     return;
   }
   sendToDB(id);
-  p = finger.deleteModel(id);
-  if (p != FINGERPRINT_OK){
-    Serial.println("Error deleting");
-    return;
-  }
 }
 
 void loop(){
   addFinger();
+  delay(2000);
 }
