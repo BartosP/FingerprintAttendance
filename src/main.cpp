@@ -1,39 +1,53 @@
-#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <MySQL_Connection.h>
 #include <MySQL_Cursor.h>
 #include <SoftwareSerial.h>
 #include <Adafruit_Fingerprint.h>
+#include <LiquidCrystal_I2C.h>
 
 SoftwareSerial SENSOR(5, 4);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SENSOR);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 IPAddress server_addr(10,0,0,33);
 char ssid[] = "bary";
 char pass[] = "22042001";
-
 char user[] = "User";
 char password[] = "Password";
+
 char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES ('%s', '%s', '%s')";
 char query[1500];
-
 WiFiClient client;
 MySQL_Connection conn(&client);
 
 void setup(){
   Serial.begin(9600);
+  Wire.begin(2, 0);
+  lcd.init();
+  lcd.backlight();
   WiFi.begin(ssid, pass);
   delay(3000);
-  Serial.println();
-  Serial.print("Pripojuji se k Wifi ");
-  Serial.println(ssid);
+  lcd.print("Pripojuji se k");
+  lcd.setCursor(0, 1);
+  lcd.print("Wifi ");
+  lcd.print(ssid);
+  delay(2000);
   while (WiFi.status() != WL_CONNECTED)
     delay(100);
-  Serial.print("Pripojeno k WiFi ");
-  Serial.println(ssid);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Pripojeno k");
+  lcd.setCursor(0, 1);
+  lcd.print("Wifi ");
+  lcd.print(ssid);
+  delay(1000);
   finger.begin(57600);
-  if (!finger.verifyPassword())
-    Serial.println("Nenalezen senzor");
+  if (!finger.verifyPassword()){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Nenalezen senzor");
+    delay(2000);
+  }
 }
 
 String getName(){
@@ -52,38 +66,37 @@ String downloadFingerpintTemplate(uint16_t id){
     case FINGERPRINT_OK:
       break;
     default:
-      Serial.print("Error");
-      return "Error";
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Error 7");
+      delay(500);
+      return "Error getting data";
   }
   p = finger.getModel();
   switch (p) {
     case FINGERPRINT_OK:
       break;
    default:
-      Serial.print("Error");
-      return "Error";
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Error 8");
+      delay(500);
+      return "Error getting data";
   }
-  uint8_t templateBuffer[534];
-  memset(templateBuffer, 0xff, 534);
   uint32_t starttime = millis();
   int i = 0;
+  String otisk = "";
   while ((i < 534) && ((millis() - starttime) < 20000)){ 
     if (SENSOR.available()){
-      templateBuffer[i] = SENSOR.read();
+      otisk += SENSOR.read();
       i++;
     }
-  }
-  char buffer[3];
-  String otisk;
-  i = 0;
-  while (i < 534){
-    otisk += itoa(templateBuffer[i], buffer, 10);
-    i++;
   }
   return otisk;
 }
 
 void sendToDB(uint16_t id){
+  Serial.println("");
   Serial.println("Zadejte jmeno:");
   String jmeno = getName();
   Serial.println("Zadejte prijmeni:");
@@ -95,23 +108,43 @@ void sendToDB(uint16_t id){
   jmeno.toCharArray(jmenoConv, jmeno.length() + 1);
   prijmeni.toCharArray(prijmeniConv, prijmeni.length() + 1);
   otisk.toCharArray(otiskConv, otisk.length() + 1);
-  Serial.println("Pripojuji se k SQL");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Pripojuji se k");
+  lcd.setCursor(0, 1);
+  lcd.print("SQL...");
+  delay(1000);
   if (conn.connect(server_addr, 3306, user, password)) {
     MySQL_Cursor *cur_mem = new MySQL_Cursor(&conn);
     sprintf(query, INSERT_DATA, jmenoConv, prijmeniConv, otiskConv);
     cur_mem->execute(query);
     delete cur_mem;
-    Serial.println("Data uspesne ulozena");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Data uspesne");
+    lcd.setCursor(0, 1);
+    lcd.print("ulozena");
+    delay(2000);
   }
-  else
-    Serial.println("Nepodarilo se pripojit");
+  else{
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Nepodarilo se");
+    lcd.setCursor(0, 1);
+    lcd.print("ulozit data");
+    delay(2000);
+  }
   conn.close();
 }
 
 void addFinger(){
   int id = 1;
   uint8_t p = -1;
-  Serial.println("Prilozte otisk pro pridani");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Prilozte otisk");
+  lcd.setCursor(0, 1);
+  lcd.print("pro pridani");
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
     switch (p){
@@ -120,7 +153,9 @@ void addFinger(){
       case FINGERPRINT_NOFINGER:
         break;
       default:
-        Serial.println("Error");
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Error 1");
         return;
     }
   }
@@ -129,15 +164,25 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      Serial.println("Error");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Error 2");
+      delay(500);
       return;
   }
-  Serial.println("Odeberte prst");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Odeberte prst");
+  delay(2000);
   p = 0;
   while(p != FINGERPRINT_NOFINGER)
     p = finger.getImage();
   p = -1;
-  Serial.println("Prilozte otisk znovu");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Prilozte otisk");
+  lcd.setCursor(0, 1);
+  lcd.print("znovu");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
     switch (p){
@@ -146,7 +191,10 @@ void addFinger(){
       case FINGERPRINT_NOFINGER:
         break;
       default:
-        Serial.println("Error");
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Error 3");
+        delay(500);
         return;
     }
   }
@@ -155,28 +203,46 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      Serial.println("Error");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Error 4");
+      delay(500);
       return;
   }
   p = finger.createModel();
   if(p == FINGERPRINT_OK){}
   else if(p == FINGERPRINT_ENROLLMISMATCH){
-    Serial.println("Otisky se neshoduji");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Otisky se");
+    lcd.setCursor(0, 1);
+    lcd.print("neshoduji");
+    delay(500);
     return;
   }
   else{
-    Serial.println("Error");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Error 5");
+    delay(500);
     return;
   }
   p = finger.storeModel(id);
   if (p != FINGERPRINT_OK){
-    Serial.println("Error");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Error 6");
+    delay(500);
     return;
   }
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Cekani na");
+  lcd.setCursor(0, 1);
+  lcd.print("udaje...");
   sendToDB(id);
 }
 
 void loop(){
   addFinger();
-  delay(2000);
 }
