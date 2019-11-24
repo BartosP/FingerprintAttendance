@@ -1,24 +1,18 @@
 #include <ESP8266WiFi.h>
-#include <MySQL_Connection.h>
-#include <MySQL_Cursor.h>
-#include <SoftwareSerial.h>
 #include <Adafruit_Fingerprint.h>
+#include <PubSubClient.h>
 #include <LiquidCrystal_I2C.h>
 
 SoftwareSerial SENSOR(5, 4);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SENSOR);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-IPAddress server_addr(10,0,0,33);
+IPAddress server(10,0,0,33);
 char ssid[] = "bary";
 char pass[] = "22042001";
-char user[] = "User";
-char password[] = "Password";
 
-char INSERT_DATA[] = "INSERT INTO attendance.fingerprints (jmeno, prijmeni, otisk) VALUES ('%s', '%s', '%s')";
-char query[1500];
-WiFiClient client;
-MySQL_Connection conn(&client);
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 void setup(){
   Serial.begin(9600);
@@ -41,6 +35,7 @@ void setup(){
   lcd.print("Wifi ");
   lcd.print(ssid);
   delay(1000);
+  client.setServer(server, 1883);
   finger.begin(57600);
   if (!finger.verifyPassword()){
     lcd.clear();
@@ -50,38 +45,22 @@ void setup(){
   }
 }
 
-String getName(){
-  String input;
-  while (!Serial.available()) {}
-  while (Serial.available()) {
-    input = Serial.readStringUntil('\n');
-    return input;
-  }
-  return "Error getting name/surname";
-}
-
 String downloadFingerpintTemplate(uint16_t id){
   uint8_t p = finger.loadModel(id);
   switch (p){
     case FINGERPRINT_OK:
       break;
     default:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Error 7");
-      delay(500);
-      return "Error getting data";
+      Serial.print("Error");
+      return "Error";
   }
   p = finger.getModel();
   switch (p) {
     case FINGERPRINT_OK:
       break;
    default:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Error 8");
-      delay(500);
-      return "Error getting data";
+      Serial.print("Error");
+      return "Error";
   }
   uint32_t starttime = millis();
   int i = 0;
@@ -96,45 +75,32 @@ String downloadFingerpintTemplate(uint16_t id){
 }
 
 void sendToDB(uint16_t id){
-  Serial.println("");
-  Serial.println("Zadejte jmeno:");
-  String jmeno = getName();
-  Serial.println("Zadejte prijmeni:");
-  String prijmeni = getName();
   String otisk = downloadFingerpintTemplate(id);
-  char jmenoConv[jmeno.length()];
-  char prijmeniConv[prijmeni.length()];
   char otiskConv[otisk.length()];
-  jmeno.toCharArray(jmenoConv, jmeno.length() + 1);
-  prijmeni.toCharArray(prijmeniConv, prijmeni.length() + 1);
   otisk.toCharArray(otiskConv, otisk.length() + 1);
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Pripojuji se k");
-  lcd.setCursor(0, 1);
-  lcd.print("SQL...");
-  delay(1000);
-  if (conn.connect(server_addr, 3306, user, password)) {
-    MySQL_Cursor *cur_mem = new MySQL_Cursor(&conn);
-    sprintf(query, INSERT_DATA, jmenoConv, prijmeniConv, otiskConv);
-    cur_mem->execute(query);
-    delete cur_mem;
+  while (!client.connected()) {
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Data uspesne");
+    lcd.print("Pripojuji se k");
     lcd.setCursor(0, 1);
-    lcd.print("ulozena");
-    delay(2000);
+    lcd.print("MQTT...");
+    delay(1000);
+    if (client.connect("espClient")) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Pripojeno");
+      client.publish("fingerprint", otiskConv);
+      delay(2000);
+    }
+    else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Nepodarilo se");
+      lcd.setCursor(0, 1);
+      lcd.print("pripojit");
+      delay(1500);
+    }
   }
-  else{
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Nepodarilo se");
-    lcd.setCursor(0, 1);
-    lcd.print("ulozit data");
-    delay(2000);
-  }
-  conn.close();
 }
 
 void addFinger(){
@@ -235,14 +201,10 @@ void addFinger(){
     delay(500);
     return;
   }
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Cekani na");
-  lcd.setCursor(0, 1);
-  lcd.print("udaje...");
   sendToDB(id);
 }
 
 void loop(){
   addFinger();
+  delay(2000);
 }

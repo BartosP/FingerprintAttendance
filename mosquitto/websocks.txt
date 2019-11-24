@@ -1,0 +1,15 @@
+port 1883
+#log_type error
+log_type notice
+log_type information
+log_type debug
+log_type websockets
+#log_type all
+connection_messages true
+#log_dest topic 
+log_dest stdout
+#allow_anonymous false
+#Extra Listeners
+port 9001
+protocol websockets
+websockets_log_level 6
