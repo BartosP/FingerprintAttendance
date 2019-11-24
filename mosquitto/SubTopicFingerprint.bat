@@ -1,0 +1,1 @@
+mosquitto_sub -h 10.0.0.33 -t fingerprint
