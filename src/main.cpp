@@ -74,7 +74,7 @@ String downloadFingerpintTemplate(uint16_t id){
   return otisk;
 }
 
-void sendToDB(uint16_t id){
+void mqttpublish(uint16_t id){
   String otisk = downloadFingerpintTemplate(id);
   char otiskConv[otisk.length()];
   otisk.toCharArray(otiskConv, otisk.length() + 1);
@@ -201,7 +201,7 @@ void addFinger(){
     delay(500);
     return;
   }
-  sendToDB(id);
+  mqttpublish(id);
 }
 
 void loop(){
