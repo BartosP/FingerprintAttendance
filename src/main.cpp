@@ -14,35 +14,26 @@ char pass[] = "22042001";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void setup(){
-  Serial.begin(9600);
-  Wire.begin(2, 0);
-  lcd.init();
-  lcd.backlight();
-  WiFi.begin(ssid, pass);
-  delay(3000);
-  lcd.print("Pripojuji se k");
-  lcd.setCursor(0, 1);
-  lcd.print("Wifi ");
-  lcd.print(ssid);
-  delay(2000);
-  while (WiFi.status() != WL_CONNECTED)
-    delay(100);
+void printLC(String first, String second){
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Pripojeno k");
+  lcd.print(first);
   lcd.setCursor(0, 1);
-  lcd.print("Wifi ");
-  lcd.print(ssid);
-  delay(1000);
-  client.setServer(server, 1883);
-  finger.begin(57600);
-  if (!finger.verifyPassword()){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Nenalezen senzor");
-    delay(2000);
-  }
+  lcd.print(second);
+  delay(1500);
+}
+
+void initWifi(){
+  WiFi.begin(ssid, pass);
+  printLC("Pripojuji se k", "WiFi");
+  while (WiFi.status() != WL_CONNECTED)
+    delay(100);
+  printLC("Pripojeno k", ssid);
+}
+
+void initFinger(){
+  if (!finger.verifyPassword())
+    printLC("Nenalezen sensor", "");
 }
 
 String downloadFingerpintTemplate(uint16_t id){
@@ -51,7 +42,6 @@ String downloadFingerpintTemplate(uint16_t id){
     case FINGERPRINT_OK:
       break;
     default:
-      Serial.print("Error");
       return "Error";
   }
   p = finger.getModel();
@@ -59,7 +49,6 @@ String downloadFingerpintTemplate(uint16_t id){
     case FINGERPRINT_OK:
       break;
    default:
-      Serial.print("Error");
       return "Error";
   }
   uint32_t starttime = millis();
@@ -79,38 +68,20 @@ void mqttpublish(uint16_t id){
   char otiskConv[otisk.length()];
   otisk.toCharArray(otiskConv, otisk.length() + 1);
   while (!client.connected()) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Pripojuji se k");
-    lcd.setCursor(0, 1);
-    lcd.print("MQTT...");
-    delay(1000);
+    printLC("Pripojuji se k", "MQTT...");
     if (client.connect("espClient")) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Pripojeno");
       client.publish("fingerprint", otiskConv);
-      delay(2000);
+      printLC("Data uspesne", "odeslana");
     }
-    else {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Nepodarilo se");
-      lcd.setCursor(0, 1);
-      lcd.print("pripojit");
-      delay(1500);
-    }
+    else
+      printLC("Nepodarilo se", "pripojit");
   }
 }
 
 void addFinger(){
   int id = 1;
   uint8_t p = -1;
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Prilozte otisk");
-  lcd.setCursor(0, 1);
-  lcd.print("pro pridani");
+  printLC("Prilozte otisk", "pro pridani");
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
     switch (p){
@@ -119,9 +90,6 @@ void addFinger(){
       case FINGERPRINT_NOFINGER:
         break;
       default:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error 1");
         return;
     }
   }
@@ -130,25 +98,15 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Error 2");
-      delay(500);
+      printLC("Error 1", "");
       return;
   }
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Odeberte prst");
-  delay(2000);
+  printLC("Odeberte prst", "");
   p = 0;
   while(p != FINGERPRINT_NOFINGER)
     p = finger.getImage();
   p = -1;
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Prilozte otisk");
-  lcd.setCursor(0, 1);
-  lcd.print("znovu");
+  printLC("Prilozte otisk", "znovu");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
     switch (p){
@@ -157,10 +115,7 @@ void addFinger(){
       case FINGERPRINT_NOFINGER:
         break;
       default:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Error 3");
-        delay(500);
+        printLC("Error 2", "");
         return;
     }
   }
@@ -169,42 +124,38 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Error 4");
-      delay(500);
+      printLC("Error 3", "");
       return;
   }
   p = finger.createModel();
   if(p == FINGERPRINT_OK){}
   else if(p == FINGERPRINT_ENROLLMISMATCH){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Otisky se");
-    lcd.setCursor(0, 1);
-    lcd.print("neshoduji");
-    delay(500);
+    printLC("Otisky se", "neshoduji");
     return;
   }
   else{
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Error 5");
-    delay(500);
+    printLC("Error 4", "");
     return;
   }
   p = finger.storeModel(id);
   if (p != FINGERPRINT_OK){
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Error 6");
-    delay(500);
+    printLC("Error 5", "");
     return;
   }
   mqttpublish(id);
 }
 
+void setup(){
+  Serial.begin(9600);
+  finger.begin(57600);
+  Wire.begin(2, 0);
+  client.setServer(server, 1883);
+  lcd.init();
+  lcd.backlight();
+  initWifi();
+  initFinger();
+}
+
 void loop(){
   addFinger();
-  delay(2000);
 }

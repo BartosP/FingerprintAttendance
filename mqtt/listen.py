@@ -1,19 +1,26 @@
 import paho.mqtt.client as mqtt
-import mysql.connector as mysql
+from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 
 Server = "10.0.0.33"
 MQTT_Port = 1883
 MQTT_Topic = "fingerprint"
 
+Base = declarative_base()
+
+class Fingerprint(Base):
+	__tablename__ = 'fingerprints'
+	
+	id = Column('id', Integer, primary_key=True)
+	name = Column('jmeno', String(50), index=True)
+	surname = Column('prijmeni', String(50), index=True)
+	finger = Column('otisk', Text)
+
 def insert_finger(name, surname, finger):
-	conn = mysql.connect(host = Server, database = 'attendance', user = 'User', password = 'Pass')
-	query = "INSERT INTO fingerprints(jmeno, prijmeni, otisk) VALUES(%s, %s, %s)"
-	args = (name, surname, finger)
-	cursor = conn.cursor()
-	cursor.execute(query, args)
-	conn.commit()
-	cursor.close()
-	conn.close()
+	fingerprint = Fingerprint(name = name, surname = surname, finger = finger)
+	session.add(fingerprint)
+	session.commit()
 	
 def on_connect(mosq, obj, flags, rc):
 	client.subscribe(MQTT_Topic, 0)
@@ -22,6 +29,13 @@ def on_message(mosq, obj, msg):
 	print("MQTT Topic: " + msg.topic)
 	print("MQTT Message: " + msg.payload.decode("utf-8") + "\n")
 	insert_finger("test", "test", msg.payload.decode("utf-8"))
+
+engine = create_engine('mysql+pymysql://User:Password@' + Server)
+engine.execute("CREATE DATABASE IF NOT EXISTS attendance")
+engine.execute("USE attendance")
+Base.metadata.create_all(bind = engine)
+Session = sessionmaker(bind = engine)
+session = Session()
 
 client = mqtt.Client()
 client.on_message = on_message
