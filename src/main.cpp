@@ -36,6 +36,17 @@ void initFinger(){
     printLC("Nenalezen sensor", "");
 }
 
+String getName(){
+  String input;
+  while (!Serial.available()) {}
+  while (Serial.available()) {
+    input = Serial.readStringUntil('\n');
+    input += "//";
+    return input;
+  }
+  return "Error";
+}
+
 String downloadFingerpintTemplate(uint16_t id){
   uint8_t p = finger.loadModel(id);
   switch (p){
@@ -64,13 +75,18 @@ String downloadFingerpintTemplate(uint16_t id){
 }
 
 void mqttpublish(uint16_t id){
-  String otisk = downloadFingerpintTemplate(id);
-  char otiskConv[otisk.length()];
-  otisk.toCharArray(otiskConv, otisk.length() + 1);
+  Serial.println("Zadejte jmeno:");
+  String message = getName();
+  Serial.println("Zadejte prijmeni:");
+  message += getName();
+  message += downloadFingerpintTemplate(id);
+  char messageConv[message.length()];
+  message.toCharArray(messageConv, message.length() + 1);
+
   while (!client.connected()) {
     printLC("Pripojuji se k", "MQTT...");
     if (client.connect("espClient")) {
-      client.publish("fingerprint", otiskConv);
+      client.publish("fingerprint", messageConv);
       printLC("Data uspesne", "odeslana");
     }
     else

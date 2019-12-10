@@ -26,13 +26,15 @@ def on_connect(mosq, obj, flags, rc):
 	client.subscribe(MQTT_Topic, 0)
 
 def on_message(mosq, obj, msg):
-	print("MQTT Topic: " + msg.topic)
-	print("MQTT Message: " + msg.payload.decode("utf-8") + "\n")
-	insert_finger("test", "test", msg.payload.decode("utf-8"))
+	message = msg.payload.decode("UTF-8").split("//")
+	if len(message) != 3:
+		print("Input error")
+	else:
+		print("MQTT Topic: " + msg.topic)
+		print("MQTT Message: " + message[0] + ", " + message[1] + ", " + message[2] + "\n")
+		insert_finger(message[0], message[1], message[2])
 
-engine = create_engine('mysql+pymysql://User:Password@' + Server)
-engine.execute("CREATE DATABASE IF NOT EXISTS attendance")
-engine.execute("USE attendance")
+engine = create_engine('mysql+pymysql://User:Password@' + Server + '/attendance')
 Base.metadata.create_all(bind = engine)
 Session = sessionmaker(bind = engine)
 session = Session()
