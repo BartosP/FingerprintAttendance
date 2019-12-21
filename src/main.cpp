@@ -7,7 +7,7 @@ SoftwareSerial SENSOR(5, 4);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&SENSOR);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-IPAddress server(10,0,0,33);
+IPAddress server(10,0,0,41);
 char ssid[] = "bary";
 char pass[] = "22042001";
 
@@ -67,7 +67,8 @@ String downloadFingerpintTemplate(uint16_t id){
   String otisk = "";
   while ((i < 534) && ((millis() - starttime) < 20000)){ 
     if (SENSOR.available()){
-      otisk += SENSOR.read();
+      otisk += String(SENSOR.read(), HEX);
+      otisk += ",";
       i++;
     }
   }

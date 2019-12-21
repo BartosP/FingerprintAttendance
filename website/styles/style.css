@@ -1,0 +1,48 @@
+html {
+    scroll-behavior: smooth;
+}
+
+h2 {
+    font-size: 110%;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+table,
+th,
+td {
+    border: 1px solid black;
+    padding: 5px;
+    table-layout: fixed;
+}
+
+td {
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+th {
+    text-align: center;
+    background-color: #666666;
+    color: white;
+}
+
+#buttons {
+    text-align: center;
+}
+
+button {
+    width: 40%;
+    text-align: center;
+    margin-left: 5%;
+    margin-right: 5%;
+    display: inline-block;
+}
+
+@media screen and (max-width: 1400px) {
+    button {
+        width: 70%;
+        margin-left: 0;
+        margin-right: 0;
+        display: block;
+    }
+}
