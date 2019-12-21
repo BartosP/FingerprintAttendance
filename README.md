@@ -8,9 +8,10 @@ Docházka do školy s využitím snímače otisků prstů
 - [x] Připojení na WiFi
 - [x] Vytvoření databáze
 - [x] Propojení s databází
-- [ ] Ukládání/mazání otisků - *Zatím pouze ukládání*
+- [x] Ukládání/mazání otisků
 - [ ] Porovnávání otisků
+- [x] Webové stránky
 - [ ] Dokončení softwaru
-- [ ] Dokumentace
+- [x] Dokumentace
 - [ ] Dokončení dokumentace
 - [ ] Vylepšení/úpravy projektu
