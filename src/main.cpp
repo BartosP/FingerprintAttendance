@@ -1,4 +1,7 @@
-#include <ESP8266WiFi.h>
+#include <ESP8266WiFi.h> 
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h> 
 #include <Adafruit_Fingerprint.h>
 #include <PubSubClient.h>
 #include <LiquidCrystal_I2C.h>
@@ -10,30 +13,36 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 IPAddress server(10,0,0,41);
 char ssid[] = "bary";
 char pass[] = "22042001";
+WiFiManager wifiManager;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void printLC(String first, String second){
+void printLC(String first, String second, int dl){
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(first);
   lcd.setCursor(0, 1);
   lcd.print(second);
-  delay(1500);
+  delay(dl);
 }
 
 void initWifi(){
-  WiFi.begin(ssid, pass);
-  printLC("Pripojuji se k", "WiFi");
-  while (WiFi.status() != WL_CONNECTED)
-    delay(100);
-  printLC("Pripojeno k", ssid);
+  wifiManager.setTimeout(20);
+  printLC("Pripojuji se k", "WiFi", 2000);
+  while(WiFi.status() != WL_CONNECTED){
+    if(!wifiManager.autoConnect("AutoconnectAP")){
+      printLC("Nepdarilo se", "pripojit k WiFi", 2000);
+      printLC("Pripojte se na", "AutoconnectAP", 10);
+    }
+  }
+  printLC("Pripojeno k", "WiFi", 2000);
 }
+
 
 void initFinger(){
   if (!finger.verifyPassword())
-    printLC("Nenalezen sensor", "");
+    printLC("Nenalezen sensor", "", 2000);
 }
 
 String getName(){
@@ -76,6 +85,7 @@ String downloadFingerpintTemplate(uint16_t id){
 }
 
 void mqttpublish(uint16_t id){
+  printLC("Zadejte udaje", "do terminalu", 200);
   Serial.println("Zadejte jmeno:");
   String message = getName();
   Serial.println("Zadejte prijmeni:");
@@ -85,20 +95,20 @@ void mqttpublish(uint16_t id){
   message.toCharArray(messageConv, message.length() + 1);
 
   while (!client.connected()) {
-    printLC("Pripojuji se k", "MQTT...");
+    printLC("Pripojuji se k", "MQTT...", 1500);
     if (client.connect("espClient")) {
       client.publish("fingerprint", messageConv);
-      printLC("Data uspesne", "odeslana");
+      printLC("Data uspesne", "odeslana", 1500);
     }
     else
-      printLC("Nepodarilo se", "pripojit");
+      printLC("Nepodarilo se", "pripojit", 1500);
   }
 }
 
 void addFinger(){
   int id = 1;
   uint8_t p = -1;
-  printLC("Prilozte otisk", "pro pridani");
+  printLC("Prilozte otisk", "pro pridani", 10);
   while (p != FINGERPRINT_OK){
     p = finger.getImage();
     switch (p){
@@ -115,15 +125,15 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      printLC("Error 1", "");
+      printLC("Error 1", "", 1000);
       return;
   }
-  printLC("Odeberte prst", "");
+  printLC("Odeberte prst", "", 1500);
   p = 0;
   while(p != FINGERPRINT_NOFINGER)
     p = finger.getImage();
   p = -1;
-  printLC("Prilozte otisk", "znovu");
+  printLC("Prilozte otisk", "znovu", 10);
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
     switch (p){
@@ -132,7 +142,7 @@ void addFinger(){
       case FINGERPRINT_NOFINGER:
         break;
       default:
-        printLC("Error 2", "");
+        printLC("Error 2", "", 1000);
         return;
     }
   }
@@ -141,22 +151,22 @@ void addFinger(){
     case FINGERPRINT_OK:
       break;
     default:
-      printLC("Error 3", "");
+      printLC("Error 3", "", 1000);
       return;
   }
   p = finger.createModel();
   if(p == FINGERPRINT_OK){}
   else if(p == FINGERPRINT_ENROLLMISMATCH){
-    printLC("Otisky se", "neshoduji");
+    printLC("Otisky se", "neshoduji", 1500);
     return;
   }
   else{
-    printLC("Error 4", "");
+    printLC("Error 4", "", 1000);
     return;
   }
   p = finger.storeModel(id);
   if (p != FINGERPRINT_OK){
-    printLC("Error 5", "");
+    printLC("Error 5", "", 1000);
     return;
   }
   mqttpublish(id);
